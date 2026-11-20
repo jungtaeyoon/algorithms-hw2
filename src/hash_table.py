@@ -159,13 +159,22 @@ class LinearHashTable:
     _EMPTY = object()
     _TOMB = object()
 
-    def __init__(self, size=11):
+    def __init__(self, size=11, max_load=0.75):
         if not isinstance(size, int) or isinstance(size, bool) or size < 2:
             raise ValueError("size must be an integer at least 2")
+        if max_load is not None:
+            if (
+                isinstance(max_load, bool)
+                or not isinstance(max_load, (int, float))
+                or max_load <= 0
+            ):
+                raise ValueError("max_load must be a positive number or None")
         self.size = size
+        self.max_load = max_load
         self.keys = [self._EMPTY for _ in range(size)]
         self.values = [None for _ in range(size)]
         self._length = 0
+        self.collision_count = 0
 
     @property
     def buckets(self):
@@ -187,7 +196,7 @@ class LinearHashTable:
                 self.keys[target] = key
                 self.values[target] = value
                 self._length += 1
-                if self._length > self.size * 0.75:
+                if self.max_load is not None and self._length > self.size * self.max_load:
                     self._resize()
                 return
             if self.keys[index] is self._TOMB:
@@ -196,6 +205,8 @@ class LinearHashTable:
             elif self.keys[index] == key:
                 self.values[index] = value
                 return
+            else:
+                self.collision_count += 1
             index = (index + 1) % self.size
             if index == start:
                 raise RuntimeError("hash table is full")
@@ -266,6 +277,7 @@ class LinearHashTable:
         self.keys = [self._EMPTY for _ in range(self.size)]
         self.values = [None for _ in range(self.size)]
         self._length = 0
+        self.collision_count = 0
         for index, key in enumerate(old_keys):
             if key is not self._EMPTY and key is not self._TOMB:
                 self.put(key, old_values[index])

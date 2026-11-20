@@ -108,6 +108,13 @@ class Base62Test(unittest.TestCase):
         with self.assertRaises(ValueError):
             URLShortener(table_type="unknown")
 
+    def test_linear_shortener_matches_chaining_behavior(self):
+        shortener = URLShortener(table_type="linear")
+        first = shortener.shorten("https://example.com/linear")
+        second = shortener.shorten("https://example.com/linear")
+        self.assertEqual(first, second)
+        self.assertEqual(shortener.expand(first), "https://example.com/linear")
+
 
 if __name__ == "__main__":
     unittest.main()
