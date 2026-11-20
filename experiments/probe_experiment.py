@@ -96,7 +96,7 @@ def write_csv(rows, path):
 def write_svg(rows, path):
     width, height = 800, 500
     left, right, top, bottom = 75, 760, 55, 430
-    max_y = 6
+    max_y = 55
 
     def x(alpha):
         return left + alpha * (right - left)
@@ -123,23 +123,34 @@ def write_svg(rows, path):
         ("chain_failure", "#72b7b2", "Chain failure"),
         ("linear_success", "#f58518", "Linear success"),
         ("linear_failure", "#e45756", "Linear failure"),
+        ("chain_theory_success", "#28527a", "Chain success theory"),
+        ("chain_theory_failure", "#2d7f78", "Chain failure theory"),
+        ("linear_theory_success", "#b85a0a", "Linear success theory"),
+        ("linear_theory_failure", "#a83232", "Linear failure theory"),
     )
     for field, color, label in series:
+        theory = "_theory_" in field
         points = []
         for row in rows:
             points.append(f"{x(row['alpha']):.1f},{y(row[field]):.1f}")
-        parts.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="2"/>')
-        for row in rows:
-            parts.append(
-                f'<circle cx="{x(row["alpha"]):.1f}" cy="{y(row[field]):.1f}" '
-                f'r="3.5" fill="{color}"/>'
-            )
+        dash = ' stroke-dasharray="6,4"' if theory else ""
+        parts.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="2"{dash}/>')
+        if not theory:
+            for row in rows:
+                parts.append(
+                    f'<circle cx="{x(row["alpha"]):.1f}" cy="{y(row[field]):.1f}" '
+                    f'r="3.5" fill="{color}"/>'
+                )
 
     legend_y = 460
     for index, (_, color, label) in enumerate(series):
-        x_pos = 100 + index * 175
-        parts.append(f'<line x1="{x_pos}" y1="{legend_y}" x2="{x_pos+24}" y2="{legend_y}" stroke="{color}" stroke-width="4"/>')
-        parts.append(f'<text x="{x_pos+30}" y="{legend_y+4}" font-size="11">{label}</text>')
+        row = index // 4
+        column = index % 4
+        x_pos = 55 + column * 185
+        item_y = legend_y + row * 18
+        dash = ' stroke-dasharray="6,4"' if "_theory_" in series[index][0] else ""
+        parts.append(f'<line x1="{x_pos}" y1="{item_y}" x2="{x_pos+24}" y2="{item_y}" stroke="{color}" stroke-width="4"{dash}/>')
+        parts.append(f'<text x="{x_pos+30}" y="{item_y+4}" font-size="10">{label}</text>')
     parts.append(f'<text x="400" y="490" text-anchor="middle" font-size="12">Load factor alpha</text>')
     parts.append("</svg>")
     path.write_text("\n".join(parts), encoding="utf-8")
