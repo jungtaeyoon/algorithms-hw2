@@ -34,6 +34,7 @@ FORM = (
     "<!doctype html><html><head><meta charset=\"utf-8\">"
     "<title>URL Shortener</title>" + STYLE + "</head><body>"
     "<h1>URL Shortener</h1>"
+    "<p><a href=\"/table\">현재 해시 테이블 보기</a></p>"
     "<form method=\"post\" action=\"/shorten\">"
     "<label>URL <input name=\"url\" type=\"url\" size=\"60\" required></label> "
     "<button type=\"submit\">짧게 만들기</button>"
@@ -128,6 +129,7 @@ class ShortenerHandler(BaseHTTPRequestHandler):
             "<!doctype html><html><head><meta charset=\"utf-8\"><title>Hash Table</title>"
             + STYLE
             + "</head><body><h1>Hash Table</h1>"
+            + "<p><a href=\"/\">URL 단축 폼으로 돌아가기</a></p>"
             + "".join(rows)
             + "</body></html>"
         )
