@@ -4,6 +4,8 @@
 def horner_hash(key: str, size: int) -> int:
     if not isinstance(key, str):
         raise TypeError("key must be a string")
+    if not isinstance(size, int) or isinstance(size, bool) or size < 1:
+        raise ValueError("size must be a positive integer")
     value = 0
     for char in key:
         value = (value * 31 + ord(char)) % size
