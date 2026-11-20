@@ -1,57 +1,57 @@
+"""base62 테스트. 실행: make test"""
+
+import sys
 import unittest
+from pathlib import Path
 
-from src.base62 import decode, encode
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from base62 import decode, encode  # noqa: E402
 
 
-class Base62Test(unittest.TestCase):
-    def test_encode_zero(self):
+class TestEncode(unittest.TestCase):
+    def test_zero(self):
         self.assertEqual(encode(0), "0")
 
-    def test_known_values(self):
-        cases = {
-            0: "0",
-            1: "1",
-            9: "9",
-            10: "a",
-            35: "z",
-            36: "A",
-            61: "Z",
-            62: "10",
-            3844: "100",
-        }
-        for number, code in cases.items():
-            self.assertEqual(encode(number), code)
+    def test_single_digits(self):
+        self.assertEqual(encode(9), "9")
+        self.assertEqual(encode(10), "a")
+        self.assertEqual(encode(35), "z")
+        self.assertEqual(encode(36), "A")
+        self.assertEqual(encode(61), "Z")
 
-    def test_decode_known_values(self):
-        cases = {
-            "0": 0,
-            "1": 1,
-            "9": 9,
-            "a": 10,
-            "z": 35,
-            "A": 36,
-            "Z": 61,
-            "10": 62,
-            "100": 3844,
-        }
-        for code, number in cases.items():
-            self.assertEqual(decode(code), number)
+    def test_carry(self):
+        self.assertEqual(encode(62), "10")
+        self.assertEqual(encode(62 * 62 - 1), "ZZ")
+        self.assertEqual(encode(62 * 62), "100")
 
-    def test_round_trip(self):
-        for number in range(10000):
-            self.assertEqual(decode(encode(number)), number)
-
-    def test_invalid_inputs(self):
+    def test_negative(self):
         with self.assertRaises(ValueError):
             encode(-1)
+
+    def test_not_int(self):
         with self.assertRaises(TypeError):
-            encode(1.5)
+            encode("12")
+        with self.assertRaises(TypeError):
+            encode(True)
+
+
+class TestDecode(unittest.TestCase):
+    def test_round_trip(self):
+        for n in [0, 1, 61, 62, 12345, 62 ** 5, 2 ** 64]:
+            self.assertEqual(decode(encode(n)), n)
+
+    def test_case_sensitive(self):
+        self.assertNotEqual(decode("a"), decode("A"))
+
+    def test_empty(self):
         with self.assertRaises(ValueError):
             decode("")
-        with self.assertRaises(ValueError):
-            decode("+10")
-        with self.assertRaises(TypeError):
-            decode(10)
+
+    def test_bad_char(self):
+        for s in ["-", "a b", "ab/", "한"]:
+            with self.assertRaises(ValueError):
+                decode(s)
 
 
 if __name__ == "__main__":

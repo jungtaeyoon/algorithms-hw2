@@ -1,286 +1,89 @@
-"""Hash-table implementations without Python hash tables or built-in hash."""
+"""개별 체이닝 해시 테이블: 주제 08의 것을 문자열 키 전용으로 다시 만든 것.
+
+칸마다 연결 리스트를 둔다. 같은 칸에 떨어진 키는 그 리스트에 이어 붙인다.
+Python의 dict, set, 내장 hash()를 쓰지 않는다. hash()를 쓰지 않는 이유는
+실행할 때마다 문자열 해시값이 바뀌어 실험을 다시 돌리면 다른 숫자가 나오기 때문이다.
+"""
+
+R = 31  # 호너 방식의 가중치. 주제 08과 같다.
 
 
-def horner_hash(key: str, size: int) -> int:
-    if not isinstance(key, str):
-        raise TypeError("key must be a string")
-    if not isinstance(size, int) or isinstance(size, bool) or size < 1:
-        raise ValueError("size must be a positive integer")
-    value = 0
-    for char in key:
-        value = (value * 31 + ord(char)) % size
-    return value
+def horner_hash(key, m):
+    """h <- (R * h + code(c)) mod M. 글자마다 나머지를 취해 h가 M보다 커지지 않는다."""
+    h = 0
+    for c in key:
+        h = (R * h + ord(c)) % m
+    return h
 
 
-def next_prime(number: int) -> int:
-    number = max(number, 2)
-    if number % 2 == 0:
-        number += 1
-    while True:
-        for divisor in range(3, int(number ** 0.5) + 1, 2):
-            if number % divisor == 0:
-                break
-        else:
-            return number
-        number += 2
-
-
-class Node:
+class _Node:
     __slots__ = ("key", "value", "next")
 
-    def __init__(self, key, value):
+    def __init__(self, key, value, next_node):
         self.key = key
         self.value = value
-        self.next = None
+        self.next = next_node
 
 
 class HashTable:
-    """Chained hash table with a public mapping-style API."""
-
-    def __init__(self, size=11, max_load=0.75):
-        if not isinstance(size, int) or isinstance(size, bool) or size < 2:
-            raise ValueError("size must be an integer at least 2")
-        if max_load is not None:
-            if (
-                isinstance(max_load, bool)
-                or not isinstance(max_load, (int, float))
-                or max_load <= 0
-            ):
-                raise ValueError("max_load must be a positive number or None")
-        self.size = size
-        self.max_load = max_load
-        self.buckets = [None for _ in range(size)]
-        self._length = 0
-        self.collision_count = 0
-
-    @property
-    def table(self):
-        return self.buckets
-
-    def _index(self, key):
-        return horner_hash(key, self.size)
-
-    def put(self, key, value):
-        if not isinstance(key, str):
-            raise TypeError("key must be a string")
-        index = self._index(key)
-        node = self.buckets[index]
-        while node is not None:
-            if node.key == key:
-                node.value = value
-                return
-            node = node.next
-        if self.buckets[index] is not None:
-            self.collision_count += 1
-        self._prepend(index, key, value)
-
-    def _prepend(self, index, key, value):
-        node = Node(key, value)
-        node.next = self.buckets[index]
-        self.buckets[index] = node
-        self._length += 1
-        if self.max_load is not None and self._length > self.size * self.max_load:
-            self._resize()
-        return node
-
-    def get(self, key, default=None):
-        if not isinstance(key, str):
-            raise TypeError("key must be a string")
-        node = self.buckets[self._index(key)]
-        while node is not None:
-            if node.key == key:
-                return node.value
-            node = node.next
-        if default is not None:
-            return default
-        raise KeyError(key)
-
-    def remove(self, key):
-        if not isinstance(key, str):
-            raise TypeError("key must be a string")
-        index = self._index(key)
-        node = self.buckets[index]
-        previous = None
-        while node is not None:
-            if node.key == key:
-                if previous is None:
-                    self.buckets[index] = node.next
-                else:
-                    previous.next = node.next
-                self._length -= 1
-                return node.value
-            previous = node
-            node = node.next
-        raise KeyError(key)
-
-    def contains(self, key):
-        try:
-            self.get(key)
-            return True
-        except KeyError:
-            return False
-
-    def __contains__(self, key):
-        return self.contains(key)
+    def __init__(self, capacity=16, max_load=1.0):
+        if capacity < 1:
+            raise ValueError("capacity는 1 이상이어야 합니다")
+        self._m = capacity
+        self._n = 0
+        self._max_load = max_load        # None이면 칸 수를 바꾸지 않는다
+        self._heads = [None] * capacity  # 칸마다 연결 리스트의 첫 노드
 
     def __len__(self):
-        return self._length
+        return self._n
 
-    def __iter__(self):
-        for bucket in self.buckets:
-            node = bucket
-            while node is not None:
-                yield node.key
-                node = node.next
+    def __contains__(self, key):
+        return self._node(key)[0] is not None
 
-    def items(self):
-        for bucket in self.buckets:
-            node = bucket
-            while node is not None:
-                yield node.key, node.value
-                node = node.next
+    @property
+    def capacity(self):
+        return self._m
 
-    def _resize(self):
-        old_buckets = self.buckets
-        self.size = next_prime(self.size * 2)
-        self.buckets = [None for _ in range(self.size)]
-        self._length = 0
-        self.collision_count = 0
-        for bucket in old_buckets:
-            node = bucket
+    @property
+    def load_factor(self):
+        return self._n / self._m
+
+    def _node(self, key):
+        """(key가 있는 노드 또는 None, 비교한 노드 수)"""
+        node = self._heads[horner_hash(key, self._m)]
+        compared = 0
+        while node is not None:
+            compared += 1
+            if node.key == key:
+                return node, compared
+            node = node.next
+        return None, compared
+
+    def find(self, key):
+        """(값 또는 None, 비교한 노드 수). 빈 칸이면 0이다."""
+        node, compared = self._node(key)
+        return (node.value if node else None), compared
+
+    def get(self, key):
+        return self.find(key)[0]
+
+    def put(self, key, value):
+        node, _ = self._node(key)
+        if node is not None:
+            node.value = value
+            return
+        i = horner_hash(key, self._m)
+        self._heads[i] = _Node(key, value, self._heads[i])  # 맨 앞에 넣는다
+        self._n += 1
+        if self._max_load is not None and self.load_factor > self._max_load:
+            self._resize(2 * self._m)
+
+    def _resize(self, new_m):
+        old = self._heads
+        self._m = new_m
+        self._n = 0
+        self._heads = [None] * new_m
+        for node in old:
             while node is not None:
                 self.put(node.key, node.value)
                 node = node.next
-
-
-class LinearHashTable:
-    """Linear-probing hash table using a tombstone for deletions."""
-
-    _EMPTY = object()
-    _TOMB = object()
-
-    def __init__(self, size=11, max_load=0.75):
-        if not isinstance(size, int) or isinstance(size, bool) or size < 2:
-            raise ValueError("size must be an integer at least 2")
-        if max_load is not None:
-            if (
-                isinstance(max_load, bool)
-                or not isinstance(max_load, (int, float))
-                or max_load <= 0
-            ):
-                raise ValueError("max_load must be a positive number or None")
-        self.size = size
-        self.max_load = max_load
-        self.keys = [self._EMPTY for _ in range(size)]
-        self.values = [None for _ in range(size)]
-        self._length = 0
-        self.collision_count = 0
-
-    @property
-    def buckets(self):
-        return self.keys
-
-    @property
-    def table(self):
-        return self.keys
-
-    def put(self, key, value):
-        if not isinstance(key, str):
-            raise TypeError("key must be a string")
-        first_tomb = None
-        index = horner_hash(key, self.size)
-        start = index
-        while True:
-            if self.keys[index] is self._EMPTY:
-                target = first_tomb if first_tomb is not None else index
-                self.keys[target] = key
-                self.values[target] = value
-                self._length += 1
-                if self.max_load is not None and self._length > self.size * self.max_load:
-                    self._resize()
-                return
-            if self.keys[index] is self._TOMB:
-                if first_tomb is None:
-                    first_tomb = index
-            elif self.keys[index] == key:
-                self.values[index] = value
-                return
-            else:
-                self.collision_count += 1
-            index = (index + 1) % self.size
-            if index == start:
-                raise RuntimeError("hash table is full")
-
-    def get(self, key, default=None):
-        if not isinstance(key, str):
-            raise TypeError("key must be a string")
-        index = horner_hash(key, self.size)
-        start = index
-        while True:
-            if self.keys[index] is self._EMPTY:
-                if default is not None:
-                    return default
-                raise KeyError(key)
-            if self.keys[index] is not self._TOMB and self.keys[index] == key:
-                return self.values[index]
-            index = (index + 1) % self.size
-            if index == start:
-                if default is not None:
-                    return default
-                raise KeyError(key)
-
-    def remove(self, key):
-        if not isinstance(key, str):
-            raise TypeError("key must be a string")
-        index = horner_hash(key, self.size)
-        start = index
-        while True:
-            if self.keys[index] is self._EMPTY:
-                raise KeyError(key)
-            if self.keys[index] is not self._TOMB and self.keys[index] == key:
-                value = self.values[index]
-                self.keys[index] = self._TOMB
-                self.values[index] = None
-                self._length -= 1
-                return value
-            index = (index + 1) % self.size
-            if index == start:
-                raise KeyError(key)
-
-    def contains(self, key):
-        try:
-            self.get(key)
-            return True
-        except KeyError:
-            return False
-
-    def __contains__(self, key):
-        return self.contains(key)
-
-    def __len__(self):
-        return self._length
-
-    def __iter__(self):
-        for key in self.keys:
-            if key is not self._EMPTY and key is not self._TOMB:
-                yield key
-
-    def items(self):
-        for index, key in enumerate(self.keys):
-            if key is not self._EMPTY and key is not self._TOMB:
-                yield key, self.values[index]
-
-    def _resize(self):
-        old_keys = self.keys
-        old_values = self.values
-        self.size = next_prime(self.size * 2)
-        self.keys = [self._EMPTY for _ in range(self.size)]
-        self.values = [None for _ in range(self.size)]
-        self._length = 0
-        self.collision_count = 0
-        for index, key in enumerate(old_keys):
-            if key is not self._EMPTY and key is not self._TOMB:
-                self.put(key, old_values[index])
-
-
-LinearProbingHashTable = LinearHashTable

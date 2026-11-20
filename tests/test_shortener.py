@@ -1,119 +1,56 @@
+"""단축기 테스트. 실행: make test"""
+
+import sys
 import unittest
+from pathlib import Path
 
-from src.hash_table import LinearHashTable
-from src.shortener import URLShortener, decode, encode, validate_url
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from shortener import Shortener  # noqa: E402
 
 
-class Base62Test(unittest.TestCase):
-    def test_encode_zero(self):
-        self.assertEqual(encode(0), "0")
+class TestShortener(unittest.TestCase):
+    def setUp(self):
+        self.s = Shortener()
 
-    def test_known_values_and_round_trip(self):
-        values = {
-            1: "1",
-            10: "a",
-            61: "Z",
-            62: "10",
-            3844: "100",
-        }
-        for number, code in values.items():
-            self.assertEqual(encode(number), code)
-            self.assertEqual(decode(code), number)
+    def test_first_code_is_1(self):
+        self.assertEqual(self.s.shorten("https://www.yonsei.ac.kr"), "1")
 
-    def test_round_trip_range(self):
-        for number in range(10000):
-            self.assertEqual(decode(encode(number)), number)
+    def test_round_trip(self):
+        urls = [f"https://example.com/{i}" for i in range(200)]
+        codes = [self.s.shorten(u) for u in urls]
+        self.assertEqual(len(set(codes)), 200)
+        for u, c in zip(urls, codes):
+            self.assertEqual(self.s.expand(c), u)
 
-    def test_invalid_inputs(self):
-        with self.assertRaises(ValueError):
-            encode(-1)
-        with self.assertRaises(ValueError):
-            decode("")
-        with self.assertRaises(ValueError):
-            decode("+10")
-        with self.assertRaises(TypeError):
-            encode("10")
+    def test_same_url_same_code(self):
+        a = self.s.shorten("https://a.com")
+        b = self.s.shorten("https://a.com")
+        c = self.s.shorten("https://b.com")
+        self.assertEqual(a, b)
+        self.assertEqual(c, "2")  # 번호를 하나만 썼다
 
-    def test_shortener_is_stable(self):
-        shortener = URLShortener()
-        first = shortener.shorten("https://example.com/a")
-        second = shortener.shorten("https://example.com/a")
-        self.assertEqual(first, "1")
-        self.assertEqual(second, "1")
-        self.assertEqual(shortener.expand(first), "https://example.com/a")
-        with self.assertRaises(KeyError):
-            shortener.expand("missing")
+    def test_strip_spaces(self):
+        a = self.s.shorten("https://a.com")
+        self.assertEqual(self.s.shorten("  https://a.com\n"), a)
+        self.assertEqual(self.s.expand(a), "https://a.com")
 
     def test_invalid_urls(self):
-        shortener = URLShortener()
-        for url in ("", "example.com", "ftp://example.com"):
-            with self.subTest(url=url):
-                with self.assertRaises(ValueError):
-                    validate_url(url)
-                    shortener.shorten(url)
+        for bad in ["ftp://a.com", "www.a.com", "http://", "https://a b",
+                    "https://" + "a" * 2041, ""]:
+            with self.assertRaises(ValueError, msg=bad):
+                self.s.shorten(bad)
 
-    def test_url_and_code_types_are_rejected(self):
-        shortener = URLShortener()
-        for url in (None, 10, 1.5, True, ["https://example.com"]):
-            with self.subTest(url=url):
-                with self.assertRaises(TypeError):
-                    shortener.shorten(url)
-        for code in (None, 10, 1.5, True, ["1"]):
-            with self.subTest(code=code):
-                with self.assertRaises(TypeError):
-                    shortener.expand(code)
+    def test_long_url_limit(self):
+        ok = "https://" + "a" * 2040  # 정확히 2048자
+        self.assertEqual(len(ok), 2048)
+        self.assertEqual(self.s.expand(self.s.shorten(ok)), ok)
 
-    def test_hosts_and_supported_schemes(self):
-        shortener = URLShortener()
-        invalid_urls = (
-            "http://",
-            "https://",
-            "ftp://example.com",
-            "mailto:user@example.com",
-        )
-        for url in invalid_urls:
-            with self.subTest(url=url):
-                with self.assertRaises(ValueError):
-                    shortener.shorten(url)
-
-    def test_repeated_url_returns_same_code(self):
-        shortener = URLShortener()
-        url = "https://example.com/repeat"
-        code = shortener.shorten(url)
-        self.assertEqual(shortener.shorten(url), code)
-        self.assertEqual(shortener.expand(code), url)
-
-    def test_different_urls_return_different_codes(self):
-        shortener = URLShortener()
-        first = "https://example.com/first"
-        second = "https://example.com/second"
-        first_code = shortener.shorten(first)
-        second_code = shortener.shorten(second)
-        self.assertNotEqual(first_code, second_code)
-        self.assertEqual(shortener.expand(first_code), first)
-        self.assertEqual(shortener.expand(second_code), second)
-
-    def test_missing_code_and_empty_code(self):
-        shortener = URLShortener()
-        for code in ("missing", ""):
-            with self.subTest(code=code):
-                with self.assertRaises(KeyError):
-                    shortener.expand(code)
-
-    def test_table_type_selects_supported_hash_table(self):
-        chaining = URLShortener(table_type="chaining")
-        linear = URLShortener(table_type="linear")
-        self.assertNotIsInstance(chaining.code_to_url, LinearHashTable)
-        self.assertIsInstance(linear.code_to_url, LinearHashTable)
-        with self.assertRaises(ValueError):
-            URLShortener(table_type="unknown")
-
-    def test_linear_shortener_matches_chaining_behavior(self):
-        shortener = URLShortener(table_type="linear")
-        first = shortener.shorten("https://example.com/linear")
-        second = shortener.shorten("https://example.com/linear")
-        self.assertEqual(first, second)
-        self.assertEqual(shortener.expand(first), "https://example.com/linear")
+    def test_unknown_code(self):
+        self.s.shorten("https://a.com")
+        self.assertIsNone(self.s.expand("zzz"))
+        self.assertIsNone(self.s.expand("!!"))
+        self.assertIsNone(self.s.expand(""))
 
 
 if __name__ == "__main__":

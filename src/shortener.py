@@ -1,75 +1,56 @@
-"""Base62 helpers and URL shortener implementation."""
+"""URL 단축기: 일련번호를 base62로 바꿔 코드로 쓴다.
 
-try:
-    from .base62 import decode as base62_decode
-    from .base62 import encode as base62_encode
-except ImportError:
-    from base62 import decode as base62_decode
-    from base62 import encode as base62_encode
-from urllib.parse import urlparse
+코드를 URL의 해시값으로 만들지 않는다. 그러면 서로 다른 URL이 같은 코드를
+받을 수 있다. 일련번호는 겹치지 않는다. 해시 테이블은 저장에만 쓴다.
+"""
 
-try:
-    from .hash_table import HashTable, LinearHashTable
-except ImportError:
-    from hash_table import HashTable, LinearHashTable
+from base62 import decode, encode
+from hash_table import HashTable
+
+MAX_URL_LENGTH = 2048
 
 
-def encode(number: int) -> str:
-    """Encode a non-negative integer as a Base62 string."""
-    return base62_encode(number)
-
-
-def decode(code: str) -> int:
-    """Decode a Base62 string into a non-negative integer."""
-    return base62_decode(code)
-
-
-def validate_url(url: str) -> str:
-    if not isinstance(url, str):
-        raise TypeError("url must be a string")
-    if not url:
-        raise ValueError("url must not be empty")
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise ValueError("url must be a valid HTTP or HTTPS URL")
-    if any(char.isspace() for char in url):
-        raise ValueError("url must not contain whitespace")
-    try:
-        hostname = parsed.hostname
-    except ValueError as exc:
-        raise ValueError("url must be a valid HTTP or HTTPS URL") from exc
-    if not hostname:
-        raise ValueError("url must be a valid HTTP or HTTPS URL")
+def validate(url):
+    """앞뒤 공백을 지운 URL. 받을 수 없는 URL이면 ValueError"""
+    url = url.strip()
+    if len(url) > MAX_URL_LENGTH:
+        raise ValueError(f"URL이 {MAX_URL_LENGTH}자를 넘습니다")
+    for scheme in ("http://", "https://"):
+        if url.startswith(scheme):
+            rest = url[len(scheme):]
+            break
+    else:
+        raise ValueError("http:// 또는 https://로 시작해야 합니다")
+    if rest == "":
+        raise ValueError("주소가 비어 있습니다")
+    if any(c.isspace() for c in url):
+        raise ValueError("URL 안에 공백이 있습니다")
     return url
 
 
-class URLShortener:
-    """Stores URLs and creates stable Base62 codes."""
+class Shortener:
+    def __init__(self):
+        self._next = 1
+        self._code_of = HashTable()  # URL -> 코드
+        self._url_of = HashTable()   # 코드 -> URL
 
-    def __init__(self, table=None, table_type="chaining"):
-        if table is not None:
-            code_table = table
-        elif table_type == "chaining":
-            code_table = HashTable()
-        elif table_type == "linear":
-            code_table = LinearHashTable()
-        else:
-            raise ValueError("table_type must be 'chaining' or 'linear'")
-        self.url_to_code = HashTable()
-        self.code_to_url = code_table
-        self.next_id = 1
+    def __len__(self):
+        return len(self._url_of)
 
-    def shorten(self, url: str) -> str:
-        url = validate_url(url)
-        if url in self.url_to_code:
-            return self.url_to_code.get(url)
-        code = encode(self.next_id)
-        self.next_id += 1
-        self.url_to_code.put(url, code)
-        self.code_to_url.put(code, url)
+    def shorten(self, url):
+        url = validate(url)
+        code = self._code_of.get(url)
+        if code is not None:
+            return code
+        code = encode(self._next)
+        self._next += 1
+        self._code_of.put(url, code)
+        self._url_of.put(code, url)
         return code
 
-    def expand(self, code: str) -> str:
-        if not isinstance(code, str):
-            raise TypeError("code must be a string")
-        return self.code_to_url.get(code)
+    def expand(self, code):
+        try:
+            decode(code)
+        except ValueError:
+            return None
+        return self._url_of.get(code)
