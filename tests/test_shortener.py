@@ -1,6 +1,6 @@
 import unittest
 
-from src.shortener import decode, encode
+from src.shortener import URLShortener, decode, encode, validate_url
 
 
 class Base62Test(unittest.TestCase):
@@ -32,6 +32,23 @@ class Base62Test(unittest.TestCase):
             decode("+10")
         with self.assertRaises(TypeError):
             encode("10")
+
+    def test_shortener_is_stable(self):
+        shortener = URLShortener()
+        first = shortener.shorten("https://example.com/a")
+        second = shortener.shorten("https://example.com/a")
+        self.assertEqual(first, "1")
+        self.assertEqual(second, "1")
+        self.assertEqual(shortener.expand(first), "https://example.com/a")
+        with self.assertRaises(KeyError):
+            shortener.expand("missing")
+
+    def test_invalid_urls(self):
+        shortener = URLShortener()
+        for url in ("", "example.com", "ftp://example.com"):
+            with self.assertRaises(ValueError):
+                validate_url(url)
+                shortener.shorten(url)
 
 
 if __name__ == "__main__":
