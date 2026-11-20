@@ -1,0 +1,111 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1010 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td
+14 TL
+(Linear Probing and Chained Hash Table Comparison) Tj
+T*
+() Tj
+T*
+(1. Experimental setup) Tj
+T*
+(Keys were stored in a size-503 table at load factors 0.10 through 0.90.) Tj
+T*
+(Average successful and unsuccessful search probes were measured.) Tj
+T*
+() Tj
+T*
+(Alpha  Chain success  Chain failure  Linear success  Linear failure) Tj
+T*
+(0.10     1.080           0.160           1.100            1.220) Tj
+T*
+(0.20     1.110           0.280           1.120            1.370) Tj
+T*
+(0.30     1.173           0.340           1.367            1.613) Tj
+T*
+(0.40     1.229           0.368           1.363            1.736) Tj
+T*
+(0.50     1.259           0.510           1.526            2.637) Tj
+T*
+(0.60     1.302           0.601           1.771            3.415) Tj
+T*
+(0.70     1.327           0.659           2.116            4.810) Tj
+T*
+(0.80     1.239           0.393           1.386            1.928) Tj
+T*
+(0.90     1.219           0.478           1.728            3.000) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 808 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td
+14 TL
+(Linear Probing and Chained Hash Table Comparison) Tj
+T*
+() Tj
+T*
+(2. Theory and interpretation) Tj
+T*
+(Chain success theory: 1 + alpha / 2. Chain failure theory: alpha.) Tj
+T*
+(Linear success theory: 1/2 * \(1 + 1/\(1-alpha\)\).) Tj
+T*
+(Linear failure theory: 1/2 * \(1 + 1/\(1-alpha\)^2\).) Tj
+T*
+() Tj
+T*
+(The measured chain costs stay close to their low, stable trend.) Tj
+T*
+(Linear probing costs rise as alpha increases, especially at high load.) Tj
+T*
+(Small deviations come from finite table size and the selected key distribution.) Tj
+T*
+() Tj
+T*
+(Conclusion) Tj
+T*
+(Chaining maintains stable search costs across the tested range.) Tj
+T*
+(Linear probing is effective at low load, but clustering makes probes) Tj
+T*
+(much more expensive as the table becomes dense.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000001309 00000 n 
+0000001435 00000 n 
+0000002294 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+2364
+%%EOF

@@ -104,7 +104,7 @@ def write_svg(rows):
 def main():
     rows = []
     rng = random.Random(2026)
-    for alpha in (0.25, 0.50, 0.75, 0.90):
+    for alpha in (0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90):
         size = 503
         count = int(size * alpha)
         keys = [f"key-{index}-{rng.randrange(1_000_000)}" for index in range(count)]

@@ -6,14 +6,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 try:
-    from .hash_table import HashTable
+    from .hash_table import HashTable, LinearHashTable
     from .shortener import URLShortener, validate_url
 except ImportError:
-    from hash_table import HashTable
+    from hash_table import HashTable, LinearHashTable
     from shortener import URLShortener, validate_url
 
 
-shortener = URLShortener(table=HashTable())
+table_kind = "chaining"
+shortener = URLShortener(table_type=table_kind)
 
 
 FORM = """<!doctype html>
@@ -80,17 +81,30 @@ class ShortenerHandler(BaseHTTPRequestHandler):
     def send_table(self):
         table = shortener.code_to_url
         rows = []
-        for index, bucket in enumerate(table.table):
-            node = bucket
-            chain = []
-            while node is not None:
-                chain.append(f"{html.escape(node.key)} -> {html.escape(str(node.value))}")
-                node = node.next
-            details = ", ".join(chain) if chain else "empty"
-            rows.append(
-                f"<tr><td>{index}</td><td>{details}</td>"
-                f"<td>Horner hash of code mod {table.size}</td></tr>"
-            )
+        if isinstance(table, LinearHashTable):
+            for index, key in enumerate(table.keys):
+                if key is table._EMPTY:
+                    details = "empty"
+                elif key is table._TOMB:
+                    details = "deleted (tombstone)"
+                else:
+                    details = f"{html.escape(key)} -> {html.escape(str(table.values[index]))}"
+                rows.append(
+                    f"<tr><td>{index}</td><td>{details}</td>"
+                    f"<td>Horner hash mod {table.size}; linear step +1</td></tr>"
+                )
+        else:
+            for index, bucket in enumerate(table.table):
+                node = bucket
+                chain = []
+                while node is not None:
+                    chain.append(f"{html.escape(node.key)} -> {html.escape(str(node.value))}")
+                    node = node.next
+                details = ", ".join(chain) if chain else "empty"
+                rows.append(
+                    f"<tr><td>{index}</td><td>{details}</td>"
+                    f"<td>Horner hash of code mod {table.size}</td></tr>"
+                )
         body = (
             "<h1>Hash Table</h1><table border='1'><tr><th>Slot</th><th>Chain</th><th>Calculation</th></tr>"
             + "".join(rows)
@@ -111,7 +125,11 @@ def serve(port=8000):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--table", choices=("chaining", "linear"), default="chaining")
     args = parser.parse_args()
+    global table_kind, shortener
+    table_kind = args.table
+    shortener = URLShortener(table_type=table_kind)
     serve(args.port)
 
 

@@ -1,6 +1,7 @@
 import unittest
 
 from src.shortener import URLShortener, decode, encode, validate_url
+from src.hash_table import LinearHashTable
 
 
 class Base62Test(unittest.TestCase):
@@ -49,6 +50,10 @@ class Base62Test(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate_url(url)
                 shortener.shorten(url)
+
+    def test_linear_table_choice(self):
+        shortener = URLShortener(table_type="linear")
+        self.assertIsInstance(shortener.code_to_url, LinearHashTable)
 
 
 if __name__ == "__main__":
