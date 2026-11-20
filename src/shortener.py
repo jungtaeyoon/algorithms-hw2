@@ -9,9 +9,9 @@ except ImportError:
 from urllib.parse import urlparse
 
 try:
-    from .hash_table import HashTable, LinearHashTable
+    from .hash_table import HashTable
 except ImportError:
-    from hash_table import HashTable, LinearHashTable
+    from hash_table import HashTable
 
 
 def encode(number: int) -> str:
@@ -32,21 +32,25 @@ def validate_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise ValueError("url must be a valid HTTP or HTTPS URL")
+    if any(char.isspace() for char in url):
+        raise ValueError("url must not contain whitespace")
+    try:
+        hostname = parsed.hostname
+    except ValueError as exc:
+        raise ValueError("url must be a valid HTTP or HTTPS URL") from exc
+    if not hostname:
+        raise ValueError("url must be a valid HTTP or HTTPS URL")
     return url
 
 
 class URLShortener:
     """Stores URLs and creates stable Base62 codes."""
 
-    def __init__(self, table=None, table_type="chaining"):
+    def __init__(self, table=None):
         if table is not None:
             code_table = table
-        elif table_type == "linear":
-            code_table = LinearHashTable()
-        elif table_type == "chaining":
-            code_table = HashTable()
         else:
-            raise ValueError("table_type must be 'chaining' or 'linear'")
+            code_table = HashTable()
         self.url_to_code = HashTable()
         self.code_to_url = code_table
         self.next_id = 1
