@@ -49,6 +49,14 @@ def validate_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise ValueError("url must be a valid HTTP or HTTPS URL")
+    if any(char.isspace() for char in url):
+        raise ValueError("url must not contain whitespace")
+    try:
+        hostname = parsed.hostname
+    except ValueError as exc:
+        raise ValueError("url must be a valid HTTP or HTTPS URL") from exc
+    if not hostname:
+        raise ValueError("url must be a valid HTTP or HTTPS URL")
     return url
 
 
