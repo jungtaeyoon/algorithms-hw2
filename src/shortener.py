@@ -1,6 +1,11 @@
 """Base62 helpers and URL shortener implementation."""
 
-ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+try:
+    from .base62 import decode as base62_decode
+    from .base62 import encode as base62_encode
+except ImportError:
+    from base62 import decode as base62_decode
+    from base62 import encode as base62_encode
 from urllib.parse import urlparse
 
 try:
@@ -11,34 +16,12 @@ except ImportError:
 
 def encode(number: int) -> str:
     """Encode a non-negative integer as a Base62 string."""
-    if isinstance(number, bool) or not isinstance(number, int):
-        raise TypeError("number must be an integer")
-    if number < 0:
-        raise ValueError("number must be non-negative")
-    if number == 0:
-        return "0"
-
-    chars = []
-    while number:
-        number, remainder = divmod(number, len(ALPHABET))
-        chars.append(ALPHABET[remainder])
-    return "".join(reversed(chars))
+    return base62_encode(number)
 
 
 def decode(code: str) -> int:
     """Decode a Base62 string into a non-negative integer."""
-    if not isinstance(code, str):
-        raise TypeError("code must be a string")
-    if not code:
-        raise ValueError("code must not be empty")
-
-    value = 0
-    for char in code:
-        position = ALPHABET.find(char)
-        if position < 0:
-            raise ValueError("code contains a character outside the Base62 alphabet")
-        value = value * len(ALPHABET) + position
-    return value
+    return base62_decode(code)
 
 
 def validate_url(url: str) -> str:
