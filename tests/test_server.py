@@ -35,6 +35,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn('action="/shorten"', body)
         self.assertIn('name="url"', body)
+        self.assertIn('href="/table"', body)
 
         form = urlencode({"url": "https://example.com/article"}).encode("ascii")
         status, _, body = self.request(
