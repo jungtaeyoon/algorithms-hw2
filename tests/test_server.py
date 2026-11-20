@@ -58,6 +58,25 @@ class ServerTest(unittest.TestCase):
         self.assertIn("Horner hash 및 충돌 과정", table)
         self.assertIn("충돌 시 다음 칸으로 순차 이동", table)
 
+    def test_linear_table_shortens_and_redirects(self):
+        server.table_kind = "linear"
+        server.linear_table = LinearHashTable()
+        server.shortener = URLShortener(table=server.linear_table)
+
+        body = urlencode({"url": "https://example.com/linear"}).encode("ascii")
+        status, _, result = self.request("POST", "/shorten", body)
+        self.assertEqual(status, 200)
+        self.assertIn('href="/1"', result)
+
+        status, location, _ = self.request("GET", "/1")
+        self.assertEqual(status, 302)
+        self.assertEqual(location, "https://example.com/linear")
+
+        status, _, table = self.request("GET", "/table")
+        self.assertEqual(status, 200)
+        self.assertIn("선형 탐지", table)
+        self.assertIn("Short code: 1", table)
+
 
 if __name__ == "__main__":
     unittest.main()

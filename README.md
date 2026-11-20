@@ -1,3 +1,4 @@
+
 # 과제2 · 에이전트와 함께 만드는 URL 단축기
 
 2026-2 **고급알고리즘**(SIT2001-01) 과제2의 **시작 저장소**입니다.
@@ -35,6 +36,7 @@
 | --- | --- |
 | 테스트 | `make test` |
 | 웹 서버 (포트 8000) | `make serve` |
+| 선형 탐지로 웹 서버 실행 | `make serve TABLE=linear` |
 | 충돌 실험 | `make experiment` |
 | 놓친 단계 따라잡기 | `sh tools/catchup.sh <단계 번호>` |
 
