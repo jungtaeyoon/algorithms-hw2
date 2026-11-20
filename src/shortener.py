@@ -49,15 +49,31 @@ def validate_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise ValueError("url must be a valid HTTP or HTTPS URL")
+    if any(char.isspace() for char in url):
+        raise ValueError("url must not contain whitespace")
+    try:
+        hostname = parsed.hostname
+    except ValueError as exc:
+        raise ValueError("url must be a valid HTTP or HTTPS URL") from exc
+    if not hostname:
+        raise ValueError("url must be a valid HTTP or HTTPS URL")
     return url
 
 
 class URLShortener:
     """Stores URLs and creates stable Base62 codes."""
 
-    def __init__(self, table=None):
+    def __init__(self, table=None, table_type="chaining"):
+        if table is not None:
+            code_table = table
+        elif table_type == "chaining":
+            code_table = HashTable()
+        elif table_type == "linear":
+            code_table = LinearHashTable()
+        else:
+            raise ValueError("table_type must be 'chaining' or 'linear'")
         self.url_to_code = HashTable()
-        self.code_to_url = table if table is not None else HashTable()
+        self.code_to_url = code_table
         self.next_id = 1
 
     def shorten(self, url: str) -> str:
