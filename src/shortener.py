@@ -1,7 +1,6 @@
 """Base62 helpers and URL shortener implementation."""
 
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-_VALUE = {char: index for index, char in enumerate(ALPHABET)}
 from urllib.parse import urlparse
 
 from .hash_table import HashTable, LinearHashTable
@@ -32,9 +31,10 @@ def decode(code: str) -> int:
 
     value = 0
     for char in code:
-        if char not in _VALUE:
+        position = ALPHABET.find(char)
+        if position < 0:
             raise ValueError("code contains a character outside the Base62 alphabet")
-        value = value * len(ALPHABET) + _VALUE[char]
+        value = value * len(ALPHABET) + position
     return value
 
 
