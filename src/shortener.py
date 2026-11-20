@@ -2,6 +2,9 @@
 
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 _VALUE = {char: index for index, char in enumerate(ALPHABET)}
+from urllib.parse import urlparse
+
+from .hash_table import HashTable, LinearHashTable
 
 
 def encode(number: int) -> str:
@@ -33,3 +36,38 @@ def decode(code: str) -> int:
             raise ValueError("code contains a character outside the Base62 alphabet")
         value = value * len(ALPHABET) + _VALUE[char]
     return value
+
+
+def validate_url(url: str) -> str:
+    if not isinstance(url, str):
+        raise TypeError("url must be a string")
+    if not url:
+        raise ValueError("url must not be empty")
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("url must be a valid HTTP or HTTPS URL")
+    return url
+
+
+class URLShortener:
+    """Stores URLs and creates stable Base62 codes."""
+
+    def __init__(self, table=None):
+        self.url_to_code = HashTable()
+        self.code_to_url = table if table is not None else HashTable()
+        self.next_id = 1
+
+    def shorten(self, url: str) -> str:
+        url = validate_url(url)
+        if url in self.url_to_code:
+            return self.url_to_code.get(url)
+        code = encode(self.next_id)
+        self.next_id += 1
+        self.url_to_code.put(url, code)
+        self.code_to_url.put(code, url)
+        return code
+
+    def expand(self, code: str) -> str:
+        if not isinstance(code, str):
+            raise TypeError("code must be a string")
+        return self.code_to_url.get(code)
