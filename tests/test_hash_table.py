@@ -34,6 +34,13 @@ class HashTableTest(unittest.TestCase):
         self.assertEqual(horner_hash("abc", 11), horner_hash("abc", 11))
         self.assertTrue(0 <= horner_hash("abc", 11) < 11)
 
+    def test_resize_can_be_disabled_with_max_load_none(self):
+        table = HashTable(4093, max_load=None)
+        for number in range(500):
+            table.put(f"key-{number}", number)
+        self.assertEqual(table.size, 4093)
+        self.assertEqual(len(table), 500)
+
 
 class LinearHashTableTest(unittest.TestCase):
     def test_linear_wrap_update_and_remove(self):
