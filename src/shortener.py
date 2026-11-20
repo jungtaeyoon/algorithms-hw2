@@ -3,7 +3,10 @@
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 from urllib.parse import urlparse
 
-from .hash_table import HashTable, LinearHashTable
+try:
+    from .hash_table import HashTable, LinearHashTable
+except ImportError:
+    from hash_table import HashTable, LinearHashTable
 
 
 def encode(number: int) -> str:
