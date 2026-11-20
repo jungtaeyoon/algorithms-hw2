@@ -41,6 +41,13 @@ class HashTableTest(unittest.TestCase):
         with self.assertRaises(KeyError):
             table.get("missing")
 
+    def test_resize_can_be_disabled_with_max_load_none(self):
+        table = HashTable(4093, max_load=None)
+        for number in range(500):
+            table.put(f"key-{number}", number)
+        self.assertEqual(table.size, 4093)
+        self.assertEqual(len(table), 500)
+
     def test_colliding_keys_share_a_chain(self):
         table = HashTable(11)
         self.assertEqual(horner_hash("a", 11), horner_hash("l", 11))

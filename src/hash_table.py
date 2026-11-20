@@ -37,10 +37,18 @@ class Node:
 class HashTable:
     """Chained hash table with a public mapping-style API."""
 
-    def __init__(self, size=11):
+    def __init__(self, size=11, max_load=0.75):
         if not isinstance(size, int) or isinstance(size, bool) or size < 2:
             raise ValueError("size must be an integer at least 2")
+        if max_load is not None:
+            if (
+                isinstance(max_load, bool)
+                or not isinstance(max_load, (int, float))
+                or max_load <= 0
+            ):
+                raise ValueError("max_load must be a positive number or None")
         self.size = size
+        self.max_load = max_load
         self.buckets = [None for _ in range(size)]
         self._length = 0
         self.collision_count = 0
@@ -71,7 +79,7 @@ class HashTable:
         node.next = self.buckets[index]
         self.buckets[index] = node
         self._length += 1
-        if self._length > self.size * 0.75:
+        if self.max_load is not None and self._length > self.size * self.max_load:
             self._resize()
         return node
 

@@ -1,19 +1,32 @@
-"""Measure average probes for chained and linear-probing hash tables."""
+"""Measure chained hash-table probes at fixed load factors."""
 
-from html import escape
+import csv
 import random
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from src.hash_table import HashTable, LinearHashTable, horner_hash
+from src.hash_table import HashTable, horner_hash
 
 
-def chain_success(table: HashTable, keys):
+TABLE_SIZE = 4093
+ALPHAS = (0.25, 0.50, 0.75, 1.00, 1.50, 2.00, 3.00, 4.00)
+SEED = 2026
+
+
+def random_urls(count, rng, prefix="url"):
+    urls = []
+    for index in range(count):
+        urls.append(
+            f"https://{prefix}.example/{index}-{rng.randrange(1_000_000_000)}"
+        )
+    return urls
+
+
+def success_probe_average(table, keys):
     total = 0
     for key in keys:
-        index = horner_hash(key, table.size)
-        node = table.table[index]
+        node = table.table[horner_hash(key, table.size)]
         probes = 1
         while node is not None:
             if node.key == key:
@@ -24,115 +37,175 @@ def chain_success(table: HashTable, keys):
     return total / len(keys)
 
 
-def chain_failure(table: HashTable, keys):
+def failure_probe_average(table, keys):
     total = 0
     for key in keys:
-        index = horner_hash(key, table.size)
-        node = table.table[index]
+        node = table.table[horner_hash(key, table.size)]
         probes = 0
         while node is not None:
             probes += 1
-            if node.key == key:
-                break
             node = node.next
         total += probes
     return total / len(keys)
 
 
-def linear_success(table: LinearHashTable, keys):
-    total = 0
-    for key in keys:
-        index = horner_hash(key, table.size)
-        probes = 1
-        while table.keys[index] is not table._EMPTY:
-            if table.keys[index] is not table._TOMB and table.keys[index] == key:
-                break
-            probes += 1
-            index = (index + 1) % table.size
-        total += probes
-    return total / len(keys)
+def write_csv(rows, path):
+    with path.open("w", encoding="utf-8", newline="") as output:
+        writer = csv.DictWriter(
+            output,
+            fieldnames=[
+                "alpha",
+                "item_count",
+                "success_observed",
+                "success_theory",
+                "failure_observed",
+                "failure_theory",
+            ],
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
 
 
-def linear_failure(table: LinearHashTable, keys):
-    total = 0
-    for key in keys:
-        index = horner_hash(key, table.size)
-        probes = 1
-        while table.keys[index] is not table._EMPTY:
-            probes += 1
-            index = (index + 1) % table.size
-            if probes > table.size:
-                break
-        total += probes
-    return total / len(keys)
+def write_svg(rows, path):
+    width, height = 800, 500
+    left, right, top, bottom = 75, 760, 55, 430
+    chart_width = right - left
+    chart_height = bottom - top
+    max_alpha = 4.0
+    max_y = 5.0
 
+    def x(alpha):
+        return left + alpha / max_alpha * chart_width
 
-def write_svg(rows):
-    width, height = 760, 420
-    left, bottom = 70, 350
-    chart_width, chart_height = 640, 280
-    max_y = 8
-    parts = [
+    def y(value):
+        return bottom - value / max_y * chart_height
+
+    lines = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">',
         '<rect width="100%" height="100%" fill="white"/>',
-        '<text x="380" y="24" text-anchor="middle" font-size="18">Probe Cost by Load Factor</text>',
+        '<text x="400" y="24" text-anchor="middle" font-size="18">'
+        "Probe Cost by Load Factor</text>",
     ]
-    for tick in range(0, 9):
-        y = bottom - tick * chart_height / max_y
-        parts.append(f'<line x1="{left}" y1="{y:.1f}" x2="{left + chart_width}" y2="{y:.1f}" stroke="#ddd"/>')
-        parts.append(f'<text x="{left-8}" y="{y+4:.1f}" text-anchor="end" font-size="12">{tick}</text>')
-    for row in rows:
-        alpha = row["alpha"]
-        x = left + alpha * chart_width
-        for key, color in (("chain_success", "#4c78a8"), ("chain_failure", "#72b7b2"),
-                           ("linear_success", "#f58518"), ("linear_failure", "#e45756")):
-            y = bottom - min(row[key], max_y) * chart_height / max_y
-            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{color}"/>')
-    legend = (
-        ("chain_success", "#4c78a8"), ("chain_failure", "#72b7b2"),
-        ("linear_success", "#f58518"), ("linear_failure", "#e45756"),
+
+    for tick in range(6):
+        y_value = tick
+        y_pos = y(y_value)
+        lines.append(
+            f'<line x1="{left}" y1="{y_pos:.1f}" x2="{right}" y2="{y_pos:.1f}" '
+            'stroke="#ddd"/>'
+        )
+        lines.append(
+            f'<text x="{left-10}" y="{y_pos+4:.1f}" text-anchor="end" '
+            f'font-size="12">{tick}</text>'
+        )
+
+    for alpha_tick in (0.25, 0.50, 1.00, 2.00, 3.00, 4.00):
+        x_pos = x(alpha_tick)
+        lines.append(
+            f'<line x1="{x_pos:.1f}" y1="{top}" x2="{x_pos:.1f}" '
+            f'y2="{bottom}" stroke="#eee"/>'
+        )
+        lines.append(
+            f'<text x="{x_pos:.1f}" y="{bottom+20}" text-anchor="middle" '
+            f'font-size="12">{alpha_tick:g}</text>'
+        )
+
+    series = (
+        ("success_observed", "#4c78a8", "Measured success"),
+        ("success_theory", "#72b7b2", "Theory 1 + alpha/2"),
+        ("failure_observed", "#e45756", "Measured failure"),
+        ("failure_theory", "#f58518", "Theory alpha"),
     )
-    for index, (key, color) in enumerate(legend):
-        x = 90 + index * 160
-        parts.append(f'<line x1="{x}" y1="385" x2="{x+24}" y2="385" stroke="{color}" stroke-width="4"/>')
-        parts.append(f'<text x="{x+30}" y="390" font-size="11">{escape(key)}</text>')
-    parts.append("</svg>")
-    with open("experiments/probe_experiment.svg", "w", encoding="utf-8") as output:
-        output.write("\n".join(parts))
+
+    for field, color, label in series:
+        points = []
+        for row in rows:
+            points.append(f"{x(row['alpha']):.1f},{y(row[field]):.1f}")
+        lines.append(
+            f'<polyline points="{" ".join(points)}" fill="none" '
+            f'stroke="{color}" stroke-width="2"/>'
+        )
+        for row in rows:
+            lines.append(
+                f'<circle cx="{x(row["alpha"]):.1f}" cy="{y(row[field]):.1f}" '
+                f'r="3.5" fill="{color}"/>'
+            )
+
+    legend_y = 460
+    for index, (_, color, label) in enumerate(series):
+        x_pos = 100 + index * 175
+        lines.append(
+            f'<line x1="{x_pos}" y1="{legend_y}" x2="{x_pos+24}" '
+            f'y2="{legend_y}" stroke="{color}" stroke-width="4"/>'
+        )
+        lines.append(
+            f'<text x="{x_pos+30}" y="{legend_y+4}" font-size="11">{label}</text>'
+        )
+
+    lines.append(
+        f'<text x="{(left+right)/2:.1f}" y="490" text-anchor="middle" '
+        'font-size="12">Load factor alpha</text>'
+    )
+    lines.append(
+        f'<text x="18" y="{(top+bottom)/2:.1f}" text-anchor="middle" '
+        'font-size="12" transform="rotate(-90 18 {(top+bottom)/2:.1f})">'
+        "Compared nodes</text>"
+    )
+    lines.append("</svg>")
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def main():
+    rng = random.Random(SEED)
     rows = []
-    rng = random.Random(2026)
-    for alpha in (0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90):
-        size = 503
-        count = int(size * alpha)
-        keys = [f"key-{index}-{rng.randrange(1_000_000)}" for index in range(count)]
-        missing = [f"missing-{index}-{rng.randrange(1_000_000)}" for index in range(count)]
+    for alpha in ALPHAS:
+        item_count = int(TABLE_SIZE * alpha)
+        keys = random_urls(item_count, rng)
+        missing = random_urls(item_count, rng, prefix="missing")
 
-        chain = HashTable(size)
-        linear = LinearHashTable(size)
+        table = HashTable(TABLE_SIZE, max_load=None)
         for index, key in enumerate(keys):
-            chain.put(key, index)
-            linear.put(key, index)
+            table.put(key, index)
 
-        row = {
-            "alpha": alpha,
-            "chain_success": chain_success(chain, keys),
-            "chain_failure": chain_failure(chain, missing),
-            "linear_success": linear_success(linear, keys),
-            "linear_failure": linear_failure(linear, missing),
-        }
-        rows.append(row)
+        success_observed = success_probe_average(table, keys)
+        failure_observed = failure_probe_average(table, missing)
+        rows.append(
+            {
+                "alpha": f"{alpha:.2f}",
+                "item_count": item_count,
+                "success_observed": f"{success_observed:.6f}",
+                "success_theory": f"{1 + alpha / 2:.6f}",
+                "failure_observed": f"{failure_observed:.6f}",
+                "failure_theory": f"{alpha:.6f}",
+            }
+        )
 
-    print("| Alpha | Chain Success | Chain Failure | Linear Success | Linear Failure |")
-    print("|---:|---:|---:|---:|---:|")
+    experiments_dir = Path(__file__).resolve().parent
+    write_csv(rows, experiments_dir / "results.csv")
+    write_svg(
+        [
+            {
+                "alpha": float(row["alpha"]),
+                "success_observed": float(row["success_observed"]),
+                "success_theory": float(row["success_theory"]),
+                "failure_observed": float(row["failure_observed"]),
+                "failure_theory": float(row["failure_theory"]),
+            }
+            for row in rows
+        ],
+        experiments_dir / "probe_experiment.svg",
+    )
+
+    print("| Alpha | Items | Success measured | Success theory | Failure measured | Failure theory |")
+    print("|---:|---:|---:|---:|---:|---:|")
     for row in rows:
         print(
-            f"| {row['alpha']:.2f} | {row['chain_success']:.3f} | {row['chain_failure']:.3f} "
-            f"| {row['linear_success']:.3f} | {row['linear_failure']:.3f} |"
+            f"| {row['alpha']} | {row['item_count']} | {row['success_observed']} "
+            f"| {row['success_theory']} | {row['failure_observed']} "
+            f"| {row['failure_theory']} |"
         )
-    write_svg(rows)
 
 
 if __name__ == "__main__":
