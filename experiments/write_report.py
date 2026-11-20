@@ -1,12 +1,15 @@
 """Write a two-page Korean PDF report comparing chaining and linear probing."""
 
 import csv
+import subprocess
+import tempfile
 from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -247,6 +250,37 @@ def main():
         leading=13)
 
     pdf.save()
+
+    # Render every text page through the Korean font first, then store the
+    # rendered pages as full-page images. This avoids glyph problems in PDF
+    # viewers that do not support embedded Unicode TrueType fonts.
+    with tempfile.TemporaryDirectory() as temp_dir:
+        prefix = str(Path(temp_dir) / "page")
+        subprocess.run(
+            ["pdftoppm", "-png", "-r", "144", str(ROOT / "report.pdf"), prefix],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        image_pdf = canvas.Canvas(str(ROOT / "report.pdf"), pagesize=(612, 792))
+        image_pdf.setTitle("Separate Chaining vs Linear Probing")
+        for page_number in (1, 2):
+            image_path = Path(temp_dir) / f"page-{page_number}.png"
+            with Image.open(image_path) as image:
+                width, height = image.size
+            image_pdf.drawImage(
+                str(image_path),
+                0,
+                0,
+                width=612,
+                height=792,
+                preserveAspectRatio=True,
+                anchor="c",
+            )
+            if page_number == 1:
+                image_pdf.showPage()
+        image_pdf.save()
 
 
 if __name__ == "__main__":
